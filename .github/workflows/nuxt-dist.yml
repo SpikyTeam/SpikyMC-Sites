@@ -1,0 +1,59 @@
+name: nuxt-dist
+
+# Builds the mc.spiky.team landing page from nuxt/ in SpikyMC-Sites and pushes
+# the prerendered site onto the gh-pages branch that GitHub Pages serves.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nuxt-dist
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout SpikyMC-Sites
+        uses: actions/checkout@v4
+        with:
+          repository: SpikyTeam/SpikyMC-Sites
+          token: ${{ secrets.PUBLISH_TOKEN }}
+          path: src
+
+      - name: Checkout the published branch
+        uses: actions/checkout@v4
+        with:
+          repository: SpikyTeam/mc.spiky.team
+          token: ${{ secrets.PUBLISH_TOKEN }}
+          ref: gh-pages
+          path: out
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/nuxt/package-lock.json
+
+      - name: Install
+        working-directory: src/nuxt
+        run: npm ci --no-audit --no-fund
+
+      - name: Fetch releases
+        working-directory: src/nuxt
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        run: node fetch-releases.mjs
+
+      - name: Prerender
+        working-directory: src/nuxt
+        run: npx nuxt generate
+
+      - name: Publish
+        run: bash src/.github/workflows/publish-nuxt.sh src/nuxt/.output/public out

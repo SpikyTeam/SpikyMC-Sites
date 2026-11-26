@@ -1,0 +1,1625 @@
+
+:root {
+  color-scheme: dark;
+  --bg: #0f140e;
+  --surface: #171f16;
+  --surface-2: #1e271c;
+  --surface-hi: #263124;
+  --surface-highest: #303d2e;
+  --primary: #80d965;
+  --on-primary: #0b3900;
+  --primary-c: #1e4d12;
+  --on-primary-c: #a2f686;
+  --secondary-c: #293826;
+  --on-secondary-c: #cfe8c7;
+  --tertiary-c: #573e00;
+  --on-tertiary-c: #ffdea6;
+  --text: #e2e6de;
+  --text-2: #c1c9bc;
+  --text-3: #889284;
+  --header-bg: #0f140ecc;
+  --header-stuck: #171f16e6;
+  --r-xl: 24px;
+  --r-lg: 16px;
+  --r-md: 12px;
+  --r-sm: 8px;
+  --r-xs: 4px;
+  --r-pill: 999px;
+  --max: 740px;
+  --header-h: 64px;
+  /* motion tokens
+     large movements use a long, overshoot-free ease-out so text stays
+     crisp; the springs are left for small controls, where a hint of
+     overshoot reads as responsive rather than wobbly */
+  --spring-fast: cubic-bezier(.3, 1.2, .55, 1);
+  --spring: cubic-bezier(.32, 1.12, .48, 1);
+  --spring-slow: cubic-bezier(.22, 1, .36, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease: cubic-bezier(.4, 0, .2, 1);
+  --d-fast: .22s;
+  --d: .42s;
+  --d-slow: .68s;
+  --f-brand: "Unbounded", system-ui, sans-serif;
+  --f-plain: "Onest", system-ui, -apple-system, sans-serif;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6faf3;
+  --surface: #ebf1e7;
+  --surface-2: #e2e9dd;
+  --surface-hi: #d8e1d3;
+  --surface-highest: #ced8c9;
+  --primary: #2c6b19;
+  --on-primary: #ffffff;
+  --primary-c: #b2f598;
+  --on-primary-c: #052100;
+  --secondary-c: #d4ead0;
+  --on-secondary-c: #111f0e;
+  --tertiary-c: #ffdea6;
+  --on-tertiary-c: #261900;
+  --text: #171d16;
+  --text-2: #42493f;
+  --text-3: #6e776a;
+  --header-bg: #f6faf3cc;
+  --header-stuck: #ebf1e7e6;
+}
+
+*, :before, :after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-h) + 16px);
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+body {
+  font-family: var(--f-plain);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+button, a {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: 0 0;
+  border: 0;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.ic {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  display: block;
+  fill: currentColor;
+  pointer-events: none;
+}
+
+.container {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* No will-change here on purpose. It used to sit on the page wrapper, which
+   promotes a layer the size of the whole document for the entire session —
+   memory the compositor then holds onto for a page that mostly does not
+   move. Paint hints belong on the handful of elements that actually animate,
+   and those get their own layer for the length of the animation. */
+section {
+  padding: 44px 0;
+}
+
+#releases {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 620px;
+}
+
+/* the reason section is the one to render lazily: it sits between the hero
+   and the download buttons, so it is the first thing a phone skips past */
+#why {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 520px;
+}
+
+/* MD3 State Layer & Ripple */
+.st {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.st:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--d-fast) var(--ease);
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .st:hover:after {
+    opacity: .08;
+  }
+}
+
+.st:focus-visible:after {
+  opacity: .1;
+}
+
+.st:active:after {
+  opacity: .12;
+}
+
+/* ══ motion ══════════════════════════════════════════════════════════════
+   Everything that moves here touches opacity and transform only, so the
+   compositor does the work and nothing triggers layout. Each entrance is
+   `both`-filled, which means the element holds its first frame before the
+   delay elapses: no flash of unstyled content, no jump when it starts.
+
+   Three tiers, and the difference matters:
+     rise    — above the fold, on load. Fast enough not to be waited on.
+     reveal  — below the fold, when scrolled to. A touch slower, since the
+               reader is already reading something else.
+     builds  — user-triggered, on a click. The only tier that animates out.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── hero: the page's one entrance, staggered by element ────────────────── */
+.rise {
+  animation: rise var(--d-slow) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 70ms + 20ms);
+}
+
+@keyframes rise {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* the mark lands with a scale rather than a slide: it is the first thing on
+   the page and it should feel placed, not pushed into place */
+.hero-icon.rise {
+  animation-name: mark-in;
+  animation-duration: var(--d-slow);
+}
+
+@keyframes mark-in {
+  0% {
+    opacity: 0;
+    transform: scale(.86);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── scroll reveal ─────────────────────────────────────────────────────── */
+html.rv .reveal:not(.is-shown) {
+  opacity: 0;
+  transform: translateY(18px);
+  /* the safety net: if the observer never fires, content still arrives. It is
+     a 2.5 s no-op animation, so it costs nothing while it waits. */
+  animation: 0s 2.5s forwards rv-safe;
+}
+
+html.rv .reveal.is-shown {
+  animation: reveal var(--d-slow) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 65ms);
+}
+
+@keyframes reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rv-safe {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* cards and grids arrive with a little scale as well as movement, which
+   separates them from the headings they sit next to */
+html.rv .reveal.is-shown:is(.feature-card, .release-card) {
+  animation-name: reveal-card;
+}
+
+@keyframes reveal-card {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(.97);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes item-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* MD3 Top App Bar */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: var(--header-h);
+  background: var(--header-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: background-color var(--d) var(--ease);
+}
+
+.nav-inner {
+  max-width: var(--max);
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-family: var(--f-brand);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -.02em;
+}
+
+/* the rounded shape is the resting state, not a hover surprise */
+.nav-brand svg {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-md);
+  flex: none;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+}
+
+.nav-links a {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 13px;
+  border-radius: var(--r-pill);
+  color: var(--text-2);
+  font-size: .88rem;
+  font-weight: 500;
+  transition:
+    color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease),
+    border-radius var(--d) var(--spring),
+    transform var(--d-fast) var(--spring-fast);
+}
+
+.nav-links a:hover {
+  color: var(--text);
+}
+
+.nav-links a.is-active {
+  background: var(--secondary-c);
+  color: var(--on-secondary-c);
+  font-weight: 600;
+}
+
+.nav-links a:active {
+  border-radius: var(--r-sm);
+  transform: scale(.95);
+}
+
+.theme-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text-2);
+  display: grid;
+  place-items: center;
+  transition:
+    border-radius var(--d) var(--spring-fast),
+    background-color var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease),
+    transform var(--d-fast) var(--spring-fast);
+}
+
+.theme-btn:hover {
+  background: var(--surface-hi);
+  color: var(--text);
+}
+
+.theme-btn:active {
+  border-radius: 10px;
+  transform: scale(.9);
+}
+
+/* Hero Section */
+.hero {
+  text-align: center;
+  padding: 56px 0 40px;
+}
+
+.hero-icon {
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 20px;
+  border-radius: 24px;
+  overflow: hidden;
+  transition:
+    border-radius var(--d) var(--spring),
+    transform var(--d) var(--spring-fast);
+}
+
+/* the mark does not move on hover: no scale, no rotation */
+.hero-icon:hover {
+  border-radius: 26px;
+}
+
+.hero-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hero h1 {
+  font-family: var(--f-brand);
+  font-size: clamp(2rem, 4.5vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -.035em;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.hero h1 span {
+  color: var(--primary);
+}
+
+.hero p {
+  margin: 12px auto 0;
+  font-size: 1rem;
+  color: var(--text-2);
+  max-width: 460px;
+}
+
+/* the one sentence that says what the launcher is; the paragraph under it
+   only backs it up */
+.hero-lead {
+  font-size: 1.12rem !important;
+  font-weight: 600;
+  color: var(--text) !important;
+  max-width: 480px;
+}
+
+.hero-sub {
+  font-size: .92rem !important;
+  color: var(--text-3) !important;
+  max-width: 500px;
+}
+
+/* The licence claim, stated plainly. This is the single fact that separates
+   the launcher from anything a visitor has to pay for, so it gets its own
+   block above the chips rather than being folded into one of them. */
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 520px;
+  margin: 22px auto 0;
+  padding: 14px 18px;
+  text-align: left;
+  border-radius: var(--r-lg);
+  background: var(--primary-c);
+  color: var(--on-primary-c);
+  font-size: .86rem;
+  line-height: 1.5;
+}
+
+.hero-badge .ic {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  opacity: .9;
+}
+
+.hero-badge strong {
+  display: block;
+  font-family: var(--f-brand);
+  font-size: .95rem;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  margin-bottom: 2px;
+}
+
+@media (max-width: 620px) {
+  .hero-badge {
+    margin-top: 18px;
+    padding: 12px 14px;
+    font-size: .82rem;
+  }
+}
+
+.hero-meta {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.hero-cta {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hero-cta .btn {
+  margin-top: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: .8rem;
+  font-weight: 600;
+  transition:
+    border-radius var(--d) var(--spring),
+    background-color var(--d-fast) var(--ease),
+    transform var(--d-fast) var(--spring-fast);
+}
+
+.chip:hover {
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
+  transform: translateY(-1px);
+}
+
+/* the primary action: the only large button on the page, so the eye lands
+   on it first */
+.btn--lg {
+  height: 52px;
+  padding: 0 28px;
+  font-size: .98rem;
+}
+
+/* Section Typography */
+.section-title {
+  font-family: var(--f-brand);
+  font-size: clamp(1.3rem, 2.5vw, 1.55rem);
+  font-weight: 700;
+  letter-spacing: -.03em;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+/* a link sitting on the same line as its heading, so "Download" and "All
+   options" read as one thing rather than as a heading and a stray link */
+.section-link--inline {
+  display: inline;
+  margin: 0;
+  font-family: var(--f-plain);
+  font-size: .86rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  vertical-align: baseline;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.section-subtitle {
+  color: var(--text-3);
+  font-size: .92rem;
+  margin-bottom: 20px;
+}
+
+/* Why Section: the reasons to pick this launcher over the one it forked from.
+   Two columns on a wide screen, one on a phone, same cards as the download
+   section so the page reads as one system. */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.feature-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  padding: 20px;
+  border-radius: var(--r-sm);
+  transition:
+    background-color var(--d-fast) var(--ease),
+    border-radius var(--d) var(--spring),
+    transform var(--d) var(--spring-fast);
+}
+
+.feature-card:nth-child(2n + 1) {
+  border-radius: var(--r-xl) var(--r-sm) var(--r-sm) var(--r-xl);
+}
+
+.feature-card:nth-child(2n) {
+  border-radius: var(--r-sm) var(--r-xl) var(--r-xl) var(--r-sm);
+}
+
+.feature-card:hover {
+  background: var(--surface-2);
+  border-radius: var(--r-xl);
+  transform: translateY(-2px);
+}
+
+/* the icon leads in slightly before its card does, so the six read as a set
+   rather than as six unrelated blocks */
+.feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 12px;
+  border-radius: var(--r-md);
+  background: var(--primary-c);
+  color: var(--on-primary-c);
+}
+
+.feature-icon .ic {
+  width: 22px;
+  height: 22px;
+}
+
+/* hover only where a pointer exists, and only on the icon: the card itself
+   already lifts, and two simultaneous reactions read as noise */
+@media (hover: hover) {
+  .feature-card:hover .feature-icon {
+    animation: icon-nudge var(--d) var(--spring-fast);
+  }
+}
+
+@keyframes icon-nudge {
+  0%   { transform: none; }
+  45%  { transform: scale(1.09); }
+  100% { transform: scale(1); }
+}
+
+.feature-title {
+  font-family: var(--f-brand);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.feature-body {
+  font-size: .88rem;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+/* the metadata numbers: small, monospaced-adjacent, clearly secondary */
+.feature-stat {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--surface-hi);
+  font-size: .76rem;
+  line-height: 1.5;
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+/* Download Section (MD3 Connected Cards) */
+.platform-group + .platform-group {
+  margin-top: 24px;
+}
+
+.platform-group-title {
+  font-family: var(--f-brand);
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--primary);
+  margin-bottom: 10px;
+  padding-left: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* a dot in the platform colour, so the label reads as a heading rather than
+   as a stray word */
+.platform-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex: none;
+}
+
+/* the recommended group gets a quiet badge rather than a louder treatment:
+   the point is to answer "which one is mine", not to out-shout the rest */
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--primary-c);
+  color: var(--on-primary-c);
+  font-family: var(--f-plain);
+  font-size: .66rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: none;
+}
+
+.platform-badge--muted {
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+
+.is-recommended .download-card {
+  background: var(--surface-2);
+}
+
+/* the button that reveals the rest, and the button that hides it again */
+.platform-note {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+.platform-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: .86rem;
+  font-weight: 600;
+  border: none;
+  transition:
+    background-color var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease),
+    border-radius var(--d) var(--spring),
+    opacity var(--d) var(--ease);
+}
+
+.platform-toggle .ic {
+  width: 18px;
+  height: 18px;
+}
+
+.platform-toggle:hover {
+  background: var(--surface-hi);
+  color: var(--text);
+  border-radius: var(--r-md);
+}
+
+/* one build on its own takes the full width, so the primary download is the
+   obvious thing to press rather than one of two equal cards */
+.download-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.download-grid--single .download-card:first-child,
+.download-grid--single .download-card:last-child {
+  border-radius: var(--r-xl);
+}
+
+/* ── the rest of the builds, appearing and disappearing ──────────────────
+   A Vue TransitionGroup drives these classes. This is the only tier that
+   animates out as well as in, because a click is a request for feedback in
+   both directions: hiding the extra builds has to look deliberate, or the
+   page seems to lose its layout.
+
+   Only opacity and transform are touched, so it stays on the compositor and
+   nothing reflows. */
+.builds {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* room for the recommended card above, so the extra builds read as a second
+   tier rather than as more of the same thing */
+.builds--below {
+  margin-top: 8px;
+  padding-top: 18px;
+  border-top: 1px solid var(--surface-hi);
+}
+
+/* The portable build of the platform that was just recommended. It is set
+   slightly apart — inset, and lighter than the featured card — because it is
+   the second choice for the same person, not a new platform. Without the
+   offset it reads as a peer of the card above it, and the eye cannot tell
+   which download is the main one. */
+.platform-group--extra {
+  position: relative;
+  margin-left: 18px;
+  padding-left: 14px;
+  border-left: 2px solid var(--primary-c);
+}
+
+.platform-group--extra .download-card {
+  background: transparent;
+  border: 1px solid var(--surface-hi);
+}
+
+.platform-group--extra .download-card:hover {
+  background: var(--surface-2);
+  border-color: transparent;
+}
+
+.platform-group--extra .platform-group-title {
+  color: var(--text-3);
+}
+
+@media (max-width: 620px) {
+  .platform-group--extra {
+    margin-left: 10px;
+    padding-left: 10px;
+  }
+}
+
+/* the group being removed leaves the flow immediately and is painted over
+   the top of the stack, so the ones below it can slide up into the gap */
+.builds-leave-active {
+  position: absolute;
+  width: 100%;
+  transition:
+    opacity var(--d-fast) var(--ease),
+    transform var(--d-fast) var(--ease);
+  pointer-events: none;
+}
+
+.builds-enter-active {
+  transition:
+    opacity var(--d) var(--ease-out),
+    transform var(--d) var(--ease-out);
+}
+
+.builds-move {
+  transition: transform var(--d) var(--ease-out);
+}
+
+.builds-enter-from {
+  opacity: 0;
+  transform: translateY(12px) scale(.985);
+}
+
+.builds-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(.99);
+}
+
+/* stagger, so three groups arrive as three things rather than one block. The
+   delay is capped: past three groups a longer wait starts to feel broken. */
+.builds-enter-active:nth-child(1) { transition-delay: 0ms; }
+.builds-enter-active:nth-child(2) { transition-delay: 70ms; }
+.builds-enter-active:nth-child(3) { transition-delay: 140ms; }
+.builds-enter-active:nth-child(4) { transition-delay: 190ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .builds-enter-active,
+  .builds-leave-active,
+  .builds-move {
+    transition-duration: .01ms !important;
+    transition-delay: 0ms !important;
+  }
+}
+
+.download-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+/* one build on its own takes the full width, so the primary download is the
+   obvious thing to press rather than one of two equal cards */
+.download-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.download-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  padding: 18px;
+  border-radius: var(--r-sm);
+  transition:
+    background-color var(--d-fast) var(--ease),
+    border-radius var(--d) var(--spring),
+    transform var(--d) var(--spring-fast);
+}
+
+.download-card:first-child {
+  border-radius: var(--r-xl) var(--r-sm) var(--r-sm) var(--r-xl);
+}
+
+.download-card:last-child {
+  border-radius: var(--r-sm) var(--r-xl) var(--r-xl) var(--r-sm);
+}
+
+.download-card:hover {
+  background: var(--surface-2);
+  border-radius: var(--r-xl);
+  transform: translateY(-2px);
+}
+
+/* platform glyph, build name, and the two numbers that matter */
+.download-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* The official marks carry their own colour, so they sit on their own rather
+   than on a chip: a coloured logo inside a coloured square reads as a sticker
+   on a sticker. The box is kept only to hold the layout steady, and it has to
+   be able to contain the mark at its larger size. */
+.download-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
+/* ── the download page ───────────────────────────────────────────────────
+   One column: the primary build first, the portable one under it. The landing
+   page uses a grid because it has to be scrolled past; here the list is the
+   page, so it reads as a document. */
+.download-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* the older-releases table only reads as a table if it sits under a rule and
+   has some air above it; inside the swapped block it loses the section gap */
+.older {
+  margin-top: 32px;
+}
+
+.note--wide {
+  grid-column: 1 / -1;
+  /* the grid already gives 8px; this is the second 8, so a step that comes
+     after picking a build is not read as another build */
+  margin-top: 8px;
+}
+
+/* ── the platform switch ──────────────────────────────────────────────────
+   One pill, absolutely positioned, translated to whichever tab is active.
+   A single moving element rather than two fading backgrounds: it makes the
+   switch read as one object moving between two places, which is what a person
+   pressing a segmented control expects to see.
+
+   Width and offset are halved and doubled by the caller through --i, so the
+   pill is 50% of the track wide and sits at (index * 100%) of its own width.
+   Both tabs are the same width, which is what makes that arithmetic work; the
+   labels are close enough in length that the fixed width is not a lie. */
+.platform-tabs {
+  position: relative;
+  display: flex;
+  margin: 0 auto 16px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  width: fit-content;
+  isolation: isolate;
+}
+
+.platform-tabs-pill {
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  border-radius: var(--r-pill);
+  background: var(--primary-c);
+  transform: translateX(calc(var(--i, 0) * 100%));
+  transition: transform var(--d) var(--spring-slow);
+}
+
+.platform-tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 148px;
+  height: 44px;
+  border-radius: var(--r-pill);
+  color: var(--text-3);
+  font-size: .88rem;
+  font-weight: 600;
+  transition: color var(--d-fast) var(--ease);
+}
+
+.platform-tab-mark {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+}
+
+.platform-tab:hover {
+  color: var(--text-2);
+}
+
+/* the active label only, so the pill behind it stays one flat colour */
+.platform-tab.is-on {
+  color: var(--on-primary-c);
+}
+
+/* ── what changes when the platform does ──────────────────────────────────
+   out-in: the old content leaves before the new arrives, so the two never
+   overlap and the list never appears to double. */
+.swap-enter-active,
+.swap-leave-active {
+  transition:
+    opacity var(--d-fast) var(--ease),
+    transform var(--d-fast) var(--ease);
+}
+
+.swap-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.swap-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-tabs-pill {
+    transition-duration: .01ms !important;
+  }
+  .swap-enter-active,
+  .swap-leave-active {
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ── what the two builds mean ─────────────────────────────────────────────
+   Short answers to the two questions people actually ask in the thread below
+   any download page: which one do I want, and why are there two. */
+.notes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 32px;
+}
+
+.note {
+  background: var(--surface);
+  padding: 18px;
+  border-radius: var(--r-md);
+}
+
+.note-title {
+  font-family: var(--f-brand);
+  font-size: .95rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.note-body {
+  font-size: .86rem;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.note-code {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 11px 13px;
+  border: 1px solid var(--surface-hi);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  /* what the <pre> handed over for free, now said out loud: it had no font of
+     its own either, only the platform's monospace */
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: .8rem;
+  color: var(--primary);
+  /* buttons centre their text by default */
+  text-align: left;
+  cursor: default;
+}
+
+/* The overflow lives here rather than on the button. There is no settled answer
+   about whether a <button> scrolls sideways at all, and there is no browser in
+   this project to find out; an ordinary span scrolls everywhere. */
+.note-code-text {
+  display: block;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* ── copying is an enhancement, so it only looks like one when it works ────
+   Without a script this is a command to read. A clickable block that answers
+   nothing is the one control a visitor cannot work around. */
+html[data-enhanced] .note-code {
+  cursor: pointer;
+  /* only now does the command make room for the hint */
+  padding-right: 84px;
+  transition:
+    border-color var(--d-fast) var(--ease),
+    background-color var(--d-fast) var(--ease);
+}
+
+html[data-enhanced] .note-code:hover,
+html[data-enhanced] .note-code:focus-visible {
+  border-color: var(--primary);
+}
+
+.note-code.is-done {
+  border-color: var(--primary);
+}
+
+/* Quiet until asked for, then it stays put to say what happened. */
+.copy-hint {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--f-plain);
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--text-3);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--d-fast) var(--ease),
+    color var(--d-fast) var(--ease);
+}
+
+html[data-enhanced] .note-code:hover .copy-hint,
+html[data-enhanced] .note-code:focus-visible .copy-hint,
+.note-code.is-done .copy-hint {
+  opacity: 1;
+}
+
+.note-code.is-done .copy-hint {
+  color: var(--primary);
+}
+
+/* The tick means copied, and only then: showing it before the click would say
+   something untrue. */
+.copy-hint .ic {
+  display: none;
+  width: 13px;
+  height: 13px;
+}
+
+.note-code.is-done .copy-hint .ic {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copy-hint,
+  html[data-enhanced] .note-code {
+    transition: none;
+  }
+}
+
+/* ══ восстановлено после обреза ════════════════════════════════════════════
+   Файл потерял всё, что шло после .note-code: старые сборки, секцию релизов,
+   карточку сборки, подвал, иконки темы, фокус и reduced motion. Здесь то, что
+   собрано заново по разметке и токенам, а не возвращено из бэкапа. */
+
+.section-why,
+.section-download,
+.section-releases {
+  padding: 76px 0;
+}
+
+/* ── the card for one build ───────────────────────────────────────────────
+   One column of small cards on the landing page, because the list has to be
+   scrolled past rather than read. */
+.download-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.download-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--surface-hi);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  transition:
+    border-color var(--d-fast) var(--ease),
+    transform var(--d-fast) var(--spring),
+    box-shadow var(--d-fast) var(--ease);
+}
+
+.download-card:hover {
+  border-color: var(--surface-highest);
+  transform: translateY(-1px);
+}
+
+/* The build the visitor is recognised as is drawn a size up. */
+.download-card--featured {
+  padding: 18px;
+  border-color: var(--surface-highest);
+  background: var(--surface-2);
+}
+
+.download-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.download-card-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: var(--r-sm);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.download-card--featured .download-card-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.download-card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.download-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.platform {
+  font-family: var(--f-brand);
+  font-size: .88rem;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+
+.build-name {
+  font-size: .76rem;
+  color: var(--text-3);
+}
+
+/* The size is typeset as a number with a smaller unit beside it: 22.8 MB reads
+   faster than 22.8MB and does not wobble while the number changes. */
+.file-size {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: .76rem;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.file-kind {
+  color: var(--text-3);
+}
+
+.file-dot {
+  opacity: .5;
+}
+
+.file-mb {
+  font-weight: 700;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.file-unit {
+  font-size: .68rem;
+}
+
+.download-link {
+  flex: none;
+}
+
+.download-link-label {
+  font-weight: 600;
+}
+
+.download-link-format {
+  font-weight: 500;
+  opacity: .7;
+}
+
+.download-link.is-disabled {
+  cursor: default;
+  opacity: .5;
+  pointer-events: none;
+}
+
+/* ── older builds ──────────────────────────────────────────────────────────
+   A table, because the shape of the data is a table: one row per release,
+   columns that line up so the eye can compare them. */
+.older {
+  margin-top: 32px;
+}
+
+.old-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--surface-hi);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.old-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--surface-hi);
+}
+
+.old-row:last-child {
+  border-bottom: none;
+}
+
+.old-tag {
+  font-family: var(--f-brand);
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 5.5em;
+}
+
+.old-date {
+  font-size: .78rem;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.old-size {
+  margin-left: auto;
+  font-size: .78rem;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The button's own rules lose on specificity to a generic one; this is the
+   name that wins, not the position in the file. */
+.old-row .old-link {
+  margin-top: 0;
+  height: 32px;
+  padding: 0 14px;
+  font-size: .8rem;
+}
+
+/* ── releases ────────────────────────────────────────────────────────────── */
+.release-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.release-card {
+  padding: 18px;
+  border: 1px solid var(--surface-hi);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.release-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.release-version {
+  font-family: var(--f-brand);
+  font-size: .95rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--text);
+}
+
+.release-date {
+  font-size: .78rem;
+  color: var(--text-3);
+}
+
+.release-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.release-actions .btn {
+  height: 34px;
+  padding: 0 14px;
+  font-size: .8rem;
+}
+
+/* ── changelog ────────────────────────────────────────────────────────────── */
+.release-body {
+  font-size: .86rem;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.release-body ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.release-body li {
+  margin-bottom: 4px;
+}
+
+.release-body li:last-child {
+  margin-bottom: 0;
+}
+
+.release-group {
+  margin-bottom: 12px;
+}
+
+.release-group:last-child {
+  margin-bottom: 0;
+}
+
+/* ── button variants ─────────────────────────────────────────────────────── */
+.btn--secondary {
+  background: var(--secondary-c);
+  color: var(--on-secondary-c);
+}
+
+.btn--surface {
+  background: var(--surface-hi);
+  color: var(--text);
+}
+
+.btn--tonal {
+  background: var(--primary-c);
+  color: var(--on-primary-c);
+}
+
+.btn--secondary:hover,
+.btn--surface:hover,
+.btn--tonal:hover {
+  filter: brightness(1.08);
+}
+
+/* ── nav bits ────────────────────────────────────────────────────────────── */
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ic--brand {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── theme icons: CSS decides which one is visible ──────────────────────────
+   The button shows a sun in the light theme and a moon in the dark one; the
+   choice is made here so it does not need JavaScript and cannot flash. */
+.theme-icon--moon {
+  display: none;
+}
+
+html[data-theme="light"] .theme-icon--sun {
+  display: none;
+}
+
+html[data-theme="light"] .theme-icon--moon {
+  display: block;
+}
+
+.sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.footer {
+  padding: 32px 0 48px;
+  border-top: 1px solid var(--surface-hi);
+  color: var(--text-3);
+  font-size: .8rem;
+}
+
+/* ── platform marks ──────────────────────────────────────────────────────── */
+.platform-tab-mark {
+  flex: none;
+  border-radius: 3px;
+}
+
+/* ── focus: visible for keyboards, invisible for mice ────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* ── reduced motion: no motion, no transitions ─────────────────────────────
+   Everything above animates; here it simply arrives. */
+@media (prefers-reduced-motion: reduce) {
+  .btn:hover,
+  .download-card:hover,
+  .feature-card:hover,
+  .theme-btn:hover .ic {
+    transform: none;
+  }
+
+  *,
+  :before,
+  :after {
+    animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: .01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── below the fold: skip layout and paint until it is near the viewport ──── */
+@media (min-width: 900px) {
+  .section-releases {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 900px;
+  }
+}
+
+/* ── the last three, from the same pass ─────────────────────────────────── */
+
+/* Tux is black, and so is the dark theme. Without a light plate behind it the
+   Linux mark is a black square on a dark one — the same trap the GitHub mark
+   walked into on the button that no longer exists. */
+.download-card-icon--plate {
+  background: #fff;
+}
+
+.ic--logo {
+  width: 26px;
+  height: 26px;
+}
+
+/* shown instead of the release list when there is nothing to list */
+.status {
+  padding: 28px 0;
+  text-align: center;
+  color: var(--text-3);
+  font-size: .88rem;
+}

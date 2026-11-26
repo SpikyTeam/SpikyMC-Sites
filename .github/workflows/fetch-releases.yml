@@ -1,0 +1,33 @@
+name: fetch releases
+
+# Refreshes nuxt/data/releases.json in SpikyMC-Sites from the SpikyMC releases,
+# so the landing page builds with current versions even between rebuilds.
+on:
+  schedule:
+    - cron: "7 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Fetch
+        working-directory: nuxt
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        run: node fetch-releases.mjs
+      - name: Commit when it changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add nuxt/data/releases.json
+          git diff --cached --quiet && echo "unchanged" && exit 0
+          git commit -m "releases: refresh from GitHub"
+          git push
