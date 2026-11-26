@@ -1,0 +1,48 @@
+name: publish downloads
+
+# Records name, size and sha256 of every asset of the latest release in
+# downloads.json, so the site can show and link mirrored binaries.
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the latest release assets
+        env:
+          GH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        run: |
+          mkdir -p .assets
+          gh release download --repo SpikyTeam/SpikyMC --dir .assets --skip-existing
+          python3 - <<'PY'
+import hashlib, json, os
+out = {}
+for name in sorted(os.listdir(".assets")):
+    path = os.path.join(".assets", name)
+    if not os.path.isfile(path):
+        continue
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    out[name] = {"size": os.path.getsize(path), "sha256": h.hexdigest()}
+json.dump(out, open("downloads.json", "w"), indent=2, sort_keys=True)
+PY
+          rm -rf .assets
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add downloads.json
+          git diff --cached --quiet && echo "nothing changed" && exit 0
+          git commit -m "downloads: $(date -u +%F)"
+          git push
