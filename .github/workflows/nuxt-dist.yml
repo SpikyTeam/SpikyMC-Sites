@@ -34,6 +34,20 @@ jobs:
           token: ${{ secrets.PUBLISH_TOKEN }}
           ref: gh-pages
           path: out
+        continue-on-error: true
+
+      - name: Start an empty published branch if there is none
+        run: |
+          if [ -d out/.git ]; then exit 0; fi
+          mkdir out && cd out
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          touch .nojekyll
+          git add .nojekyll
+          git commit -q -m "start the published branch"
+          git remote add origin "https://x-access-token:${{ secrets.PUBLISH_TOKEN }}@github.com/SpikyTeam/mc.spiky.team.git"
+          git push -q origin gh-pages
 
       - uses: actions/setup-node@v4
         with:

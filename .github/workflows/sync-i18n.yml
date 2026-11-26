@@ -37,22 +37,9 @@ jobs:
           I18N_WORK_DIR: ${{ github.workspace }}/../i18n-work
           I18N_OVERLAY_DIR: ${{ github.workspace }}/../i18n-overlay
           I18N_BASE_TS_DIR: ${{ github.workspace }}/.spikymc/infra/i18n
-        run: |
-          mkdir -p "$I18N_OVERLAY_DIR"
-          # only the overlay files; base-<code>.ts are the input lconvert merges into
-          find .spikymc/infra/i18n -maxdepth 1 -name '*.ts' ! -name 'base-*' -exec cp {} "$I18N_OVERLAY_DIR/" \;
-          python3 .spikymc/infra/i18n/i18n_sync.py
+        run: bash .github/workflows/sync-i18n.sh
 
       - name: Commit
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add i18n
-          git diff --cached --quiet && echo "translations unchanged" && exit 0
-          git commit -m "i18n: refresh from i18n.prismlauncher.org"
-          git push
-
-      - name: Republish mc.spiky.team
         env:
           GH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-        run: gh workflow run pages.yml --repo SpikyTeam/mc.spiky.team
+        run: bash .github/workflows/commit-i18n.sh
