@@ -55,9 +55,7 @@ jobs:
 
       - name: Install
         working-directory: src/nuxt
-        # no lock file in the repo: the versions move with nuxt itself and a
-        # stale lock would only fail the install
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund nuxt@^3.17.5
 
       - name: Fetch releases
         working-directory: src/nuxt
