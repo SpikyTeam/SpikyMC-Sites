@@ -52,13 +52,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
       - name: Install
         working-directory: src/nuxt
-        run: |
-          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund
-          else npm install --no-audit --no-fund; fi
+        # no lock file in the repo: the versions move with nuxt itself and a
+        # stale lock would only fail the install
+        run: npm install --no-audit --no-fund
 
       - name: Fetch releases
         working-directory: src/nuxt
